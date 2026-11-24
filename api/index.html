@@ -1,0 +1,127 @@
+html
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Knife Blox | Anlık Roblox Item Takipçisi</title>
+  <script src="https://tailwindcss.com"></script>
+  <style>
+    body { background-color: #0b0e14; color: #e2e8f0; font-family: 'Inter', sans-serif; }
+    .card-hover:hover { transform: translateY(-4px); border-color: #ef4444; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Üst Menü (Marka Alanı) -->
+  <header class="border-b border-slate-800 bg-[#0f131a]/90 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 to-rose-800 flex items-center justify-center font-black text-white text-xl shadow-lg shadow-red-600/20">
+          KB
+        </div>
+        <div>
+          <h1 class="text-xl font-extrabold tracking-tight text-white">KNIFE <span class="text-red-500">BLOX</span></h1>
+          <p class="text-xs text-slate-400">Anlık Roblox Katalog & UGC Radarı</p>
+        </div>
+      </div>
+
+      <!-- Filtre Butonları -->
+      <div class="flex items-center gap-2">
+        <button id="btnAll" onclick="setFilter(false)" class="px-4 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white transition">
+          Tüm Yeni Eşyalar
+        </button>
+        <button id="btnFree" onclick="setFilter(true)" class="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+          🔥 Sadece Ücretsiz (Free)
+        </button>
+        <button onclick="loadItems()" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300" title="Yenile">
+          ↻
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Durum Çubuğu -->
+  <div class="max-w-7xl mx-auto w-full px-4 pt-6 flex items-center justify-between text-xs text-slate-400">
+    <div class="flex items-center gap-2">
+      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+      <span id="statusText">Canlı veri akışı aktif (Her 45 saniyede bir güncellenir)</span>
+    </div>
+    <span id="lastUpdated"></span>
+  </div>
+
+  <!-- Ürün Kartları Izgarası -->
+  <main class="max-w-7xl mx-auto w-full px-4 py-6 flex-1">
+    <div id="grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+      <!-- Kartlar buraya yüklenecek -->
+    </div>
+  </main>
+
+  <!-- Alt Bilgi -->
+  <footer class="border-t border-slate-800 py-6 text-center text-xs text-slate-500">
+    © 2026 <strong>Knife Blox</strong>. Roblox Corporation ile resmi bir bağlantısı yoktur.
+  </footer>
+
+  <script>
+    let freeOnly = false;
+
+    function setFilter(isFree) {
+      freeOnly = isFree;
+      document.getElementById('btnAll').className = !isFree 
+        ? 'px-4 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white transition'
+        : 'px-4 py-2 rounded-lg text-sm font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition';
+      
+      document.getElementById('btnFree').className = isFree 
+        ? 'px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white transition'
+        : 'px-4 py-2 rounded-lg text-sm font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition';
+      
+      loadItems();
+    }
+
+    async function loadItems() {
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '<div class="col-span-full text-center py-20 text-slate-400">Roblox kataloğu taranıyor...</div>';
+
+      try {
+        const res = await fetch(`/api/items?freeOnly=${freeOnly}`);
+        const data = await res.json();
+
+        if (!data.items || data.items.length === 0) {
+          grid.innerHTML = '<div class="col-span-full text-center py-20 text-slate-400">Şu an listelenecek eşya bulunamadı.</div>';
+          return;
+        }
+
+        grid.innerHTML = data.items.map(item => `
+          <a href="${item.url}" target="_blank" rel="noopener noreferrer" 
+             class="card-hover bg-[#131822] border border-slate-800 rounded-xl overflow-hidden flex flex-col transition duration-200">
+            <div class="relative aspect-square bg-[#0d1117] p-3 flex items-center justify-center">
+              <img src="${item.image}" alt="${item.name}" class="w-full h-full object-contain" loading="lazy" />
+              <span class="absolute top-2 right-2 text-[11px] font-bold px-2 py-1 rounded-md ${item.isFree ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-900/90 text-amber-400 border border-slate-700'}">
+                ${item.price}
+              </span>
+            </div>
+            <div class="p-3 flex-1 flex flex-col justify-between">
+              <div>
+                <h2 class="text-sm font-bold text-white line-clamp-1" title="${item.name}">${item.name}</h2>
+                <p class="text-xs text-slate-400 mt-1">Yapımcı: <span class="text-slate-300">${item.creator}</span></p>
+              </div>
+              <div class="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs text-red-400 font-medium">
+                <span>Roblox'ta Gör</span>
+                <span>↗</span>
+              </div>
+            </div>
+          </a>
+        `).join('');
+
+        const now = new Date().toLocaleTimeString('tr-TR');
+        document.getElementById('lastUpdated').innerText = `Son güncelleme: ${now}`;
+      } catch (err) {
+        grid.innerHTML = '<div class="col-span-full text-center py-20 text-red-400">Bağlantı hatası oluştu, birazdan tekrar denenecek.</div>';
+      }
+    }
+
+    loadItems();
+    setInterval(loadItems, 45000); // 45 saniyede bir otomatik yenile
+  </script>
+</body>
+</html>
