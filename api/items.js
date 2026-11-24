@@ -1,15 +1,15 @@
-export default async function handler(req, res) {
-  const { freeOnly } = req.query;
+module.exports = async (req, res) => {
+  const { freeOnly } = req.query || {};
 
   const headers = {
     'Accept': 'application/json',
-    'User-Agent': 'KnifeBlox-Catalog-Radar/1.0'
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
   };
 
   try {
     let items = [];
 
-    // 1. Kaynak: RoProxy Katalog v1 (En Yeni Eşyalar)
+    // 1. Kaynak: RoProxy Katalog v1
     const v1Url = `https://roproxy.com{freeOnly === 'true' ? '&MaxPrice=0' : ''}`;
     const res1 = await fetch(v1Url, { headers });
     if (res1.ok) {
@@ -35,18 +35,18 @@ export default async function handler(req, res) {
         const entries = Object.entries(data3.items || {}).slice(-30).reverse();
         items = entries.map(([id, info]) => ({
           id: Number(id),
-          name: info,
+          name: info[0],
           creatorName: 'Roblox Limited',
-          price: info > 0 ? info : null
+          price: info[2] > 0 ? info[2] : null
         }));
       }
     }
 
     if (items.length === 0) {
-      return res.status(200).json({ items: [], debug: 'Kaynaklardan boş liste döndü' });
+      return res.status(200).json({ items: [], debug: 'Kaynaklardan veri dönmedi' });
     }
 
-    // Küçük resimleri (Thumbnail) RoProxy üzerinden çekme
+    // Küçük resimleri (Thumbnail) çekme
     const ids = items.map(i => i.id).join(',');
     let thumbMap = {};
     try {
@@ -63,9 +63,9 @@ export default async function handler(req, res) {
       id: item.id,
       name: item.name,
       creator: item.creatorName || 'Roblox',
-      price: item.price === 0 ? 'ÜCRETSİZ' : (item.price ? `${item.price.toLocaleString('tr-TR')} Robux` : 'Limited / Satışta Değil'),
+      price: item.price === 0 ? 'ÜCRETSİZ' : (item.price ? `${Number(item.price).toLocaleString('tr-TR')} Robux` : 'Limited / Satışta Değil'),
       isFree: item.price === 0,
-      image: thumbMap[item.id] || `https://rbxcdn.com`,
+      image: thumbMap[item.id] || 'https://rbxcdn.com',
       url: `https://roblox.com{item.id}`
     }));
 
@@ -74,4 +74,4 @@ export default async function handler(req, res) {
   } catch (error) {
     return res.status(200).json({ items: [], debug: error.message });
   }
-}
+};
