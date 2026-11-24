@@ -1,74 +1,72 @@
 export default async function handler(req, res) {
   const { freeOnly } = req.query;
 
+  const headers = {
+    'Accept': 'application/json',
+    'User-Agent': 'KnifeBlox-Catalog-Radar/1.0'
+  };
+
   try {
-    // 1. Yöntem: Roblox Catalog v2 Güncel Uç Noktası
-    let v2Url = 'https://roblox.com';
-    if (freeOnly === 'true') {
-      v2Url += '&maxPrice=0';
-    }
-
-    const response = await fetch(v2Url, {
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
-      }
-    });
-
     let items = [];
 
-    if (response.ok) {
-      const data = await response.json();
-      items = (data.data || []).map(item => ({
-        id: item.id,
-        name: item.name,
-        creator: item.creatorName || 'UGC Üreticisi',
-        price: item.price === 0 ? 'ÜCRETSİZ' : (item.price ? `${item.price} Robux` : 'Satışta Değil'),
-        isFree: item.price === 0,
-        url: `https://roblox.com{item.id}`
-      }));
+    // 1. Kaynak: RoProxy Katalog v1 (En Yeni Eşyalar)
+    const v1Url = `https://roproxy.com{freeOnly === 'true' ? '&MaxPrice=0' : ''}`;
+    const res1 = await fetch(v1Url, { headers });
+    if (res1.ok) {
+      const data1 = await res1.json();
+      items = data1.data || [];
     }
 
-    // 2. Yöntem (Yedek Motor): Roblox v2 engellenirse Rolimon's açık kataloğundan çek
+    // 2. Kaynak (Yedek): RoProxy Katalog v2
+    if (items.length === 0) {
+      const v2Url = `https://roproxy.com{freeOnly === 'true' ? '&maxPrice=0' : ''}`;
+      const res2 = await fetch(v2Url, { headers });
+      if (res2.ok) {
+        const data2 = await res2.json();
+        items = data2.data || [];
+      }
+    }
+
+    // 3. Kaynak (Garanti Yedek): Rolimon's Açık Eşya Veritabanı
     if (items.length === 0 && freeOnly !== 'true') {
-      const roliRes = await fetch('https://api.rolimons.com/items/v1/itemdetails', {
-        headers: { 'User-Agent': 'KnifeBlox-Tracker/1.0' }
-      });
-      if (roliRes.ok) {
-        const roliData = await roliRes.json();
-        const entries = Object.entries(roliData.items || {}).slice(-30).reverse();
+      const res3 = await fetch('https://rolimons.com', { headers });
+      if (res3.ok) {
+        const data3 = await res3.json();
+        const entries = Object.entries(data3.items || {}).slice(-30).reverse();
         items = entries.map(([id, info]) => ({
           id: Number(id),
           name: info[0],
-          creator: 'Roblox Limited',
-          price: info[2] > 0 ? `${info[2].toLocaleString('tr-TR')} RAP` : 'Limited',
-          isFree: false,
-          url: `https://roblox.com{id}`
+          creatorName: 'Roblox Limited',
+          price: info[2] > 0 ? info[2] : null
         }));
       }
     }
 
     if (items.length === 0) {
-      return res.status(200).json({ items: [], debug: `Roblox Yanıt Kodu: ${response.status}` });
+      return res.status(200).json({ items: [], debug: 'Kaynaklardan boş liste döndü' });
     }
 
-    // Eşya küçük resimlerini (Thumbnail) çekme
-    const assetIds = items.map(item => item.id).join(',');
-    const thumbUrl = `https://roblox.com{assetIds}&size=420x420&format=Png&isCircular=false`;
-
-    const thumbRes = await fetch(thumbUrl);
-    const thumbData = await thumbRes.json();
-
-    const thumbMap = {};
-    if (thumbData.data) {
-      thumbData.data.forEach(t => {
-        thumbMap[t.targetId] = t.imageUrl;
-      });
-    }
+    // Küçük resimleri (Thumbnail) RoProxy üzerinden çekme
+    const ids = items.map(i => i.id).join(',');
+    let thumbMap = {};
+    try {
+      const thumbRes = await fetch(`https://roproxy.com{ids}&size=420x420&format=Png&isCircular=false`, { headers });
+      if (thumbRes.ok) {
+        const thumbData = await thumbRes.json();
+        (thumbData.data || []).forEach(t => {
+          thumbMap[t.targetId] = t.imageUrl;
+        });
+      }
+    } catch (e) {}
 
     const enrichedItems = items.map(item => ({
-      ...item,
-      image: thumbMap[item.id] || 'https://rbxcdn.com'
+      id: item.id,
+      name: item.name,
+      creator: item.creatorName || 'Roblox',
+      price: item.price === 0 ? 'ÜCRETSİZ' : (item.price ? `${item.price.toLocaleString('tr-TR')} Robux` : 'Limited / Satışta Değil'),
+      isFree: item.price === 0,
+      image: thumbMap[item.id] || `https://rbxcdn.com`,
+      url: `https://roblox.com{item.id}`
     }));
 
     res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate');
