@@ -144,6 +144,10 @@
 
   <script>
     let freeOnly = false;
+unction setFilter(isFree) {
+      freeOnly = isFree;
+        <script>
+    let freeOnly = false;
 
     function setFilter(isFree) {
       freeOnly = isFree;
@@ -157,69 +161,44 @@
       grid.innerHTML = '<div class="msg">Roblox kataloğu taranıyor...</div>';
 
       try {
-        // Doğrudan RoProxy üzerinden güncel Roblox kataloğunu çekme
-        let robloxApi = `https://roproxy.com{freeOnly ? '&MaxPrice=0' : ''}`;
-        let res = await fetch(robloxApi);
-        let data = await res.json();
-        let rawItems = data.data || [];
+        const res = await fetch(`/api/items?freeOnly=${freeOnly}`);
+        const data = await res.json();
 
-        // Yedek olarak v2 uç noktasını dene
-        if (rawItems.length === 0) {
-          let v2Api = `https://roproxy.com{freeOnly ? '&maxPrice=0' : ''}`;
-          res = await fetch(v2Api);
-          data = await res.json();
-          rawItems = data.data || [];
-        }
-
-        if (rawItems.length === 0) {
-          grid.innerHTML = '<div class="msg">Şu an bu filtrede yeni eşya bulunamadı. "Tüm Yeni Eşyalar" sekmesini deneyin.</div>';
+        if (!data.items || data.items.length === 0) {
+          grid.innerHTML = `<div class="msg">Şu an listelenecek eşya bulunamadı. ${data.debug ? '(' + data.debug + ')' : ''}</div>`;
           return;
         }
 
-        // Küçük resimleri (Thumbnail) RoProxy üzerinden çekme
-        const ids = rawItems.map(i => i.id).join(',');
-        let thumbMap = {};
-        try {
-          const thumbRes = await fetch(`https://roproxy.com{ids}&size=420x420&format=Png&isCircular=false`);
-          const thumbData = await thumbRes.json();
-          if (thumbData.data) {
-            thumbData.data.forEach(t => { thumbMap[t.targetId] = t.imageUrl; });
-          }
-        } catch (e) {}
-
-        grid.innerHTML = rawItems.map(item => {
-          const isFree = item.price === 0;
-          const priceText = isFree ? 'ÜCRETSİZ' : (item.price ? `${item.price} Robux` : 'Satışta Değil');
-          const imgUrl = thumbMap[item.id] || `https://roblox.com{item.id}&width=420&height=420&format=png`;
-          return `
-            <a href="https://roblox.com{item.id}" target="_blank" rel="noopener noreferrer" class="card">
-              <div class="img-box">
-                <img src="${imgUrl}" alt="${item.name}" loading="lazy" />
-                <span class="badge ${isFree ? 'badge-free' : 'badge-robux'}">${priceText}</span>
+        grid.innerHTML = data.items.map(item => `
+          <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="card">
+            <div class="img-box">
+              <img src="${item.image}" alt="${item.name}" loading="lazy" />
+              <span class="badge ${item.isFree ? 'badge-free' : 'badge-robux'}">${item.price}</span>
+            </div>
+            <div class="card-body">
+              <div>
+                <div class="card-title" title="${item.name}">${item.name}</div>
+                <div class="card-creator">Yapımcı: ${item.creator}</div>
               </div>
-              <div class="card-body">
-                <div>
-                  <div class="card-title" title="${item.name}">${item.name}</div>
-                  <div class="card-creator">Yapımcı: ${item.creatorName || 'Roblox'}</div>
-                </div>
-                <div class="card-footer">
-                  <span>Roblox'ta Gör</span>
-                  <span>↗</span>
-                </div>
+              <div class="card-footer">
+                <span>Roblox'ta Gör</span>
+                <span>↗</span>
               </div>
-            </a>
-          `;
-        }).join('');
+            </div>
+          </a>
+        `).join('');
 
         document.getElementById('lastUpdated').innerText = 'Son güncelleme: ' + new Date().toLocaleTimeString('tr-TR');
       } catch (err) {
-        grid.innerHTML = `<div class="msg">Veri çekilirken hata oluştu (${err.message}). Sayfayı yenileyin.</div>`;
+        grid.innerHTML = `<div class="msg">Bağlantı hatası: ${err.message}</div>`;
       }
     }
 
     loadItems();
     setInterval(loadItems, 45000);
   </script>
+
+    
 </body>
 </html>
 
