@@ -1,8 +1,10 @@
 json
 {
-  "name": "knife-blox",
+  "name": "knifeblox",
   "version": "1.0.0",
+  "type": "module",
   "dependencies": {
-    "@vercel/node": "^3.0.0"
+    "@vercel/node": "^3.2.0"
   }
 }
+
